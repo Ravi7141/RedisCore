@@ -1,9 +1,12 @@
 package com.example.redisguard.controller;
 
+import com.example.redisguard.dto.request.CreateCommentRequest;
 import com.example.redisguard.dto.request.CreatePostRequest;
 import com.example.redisguard.dto.response.ApiResponse;
+import com.example.redisguard.dto.response.CommentResponse;
 import com.example.redisguard.dto.response.LikeResponse;
 import com.example.redisguard.dto.response.PostResponse;
+import com.example.redisguard.service.CommentService;
 import com.example.redisguard.service.PostService;
 import com.example.redisguard.service.ViralityService;
 import jakarta.validation.Valid;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class PostController {
 
     private final PostService postService;
+    private final CommentService commentService;
     private final ViralityService viralityService;
 
     @PostMapping
@@ -27,6 +31,16 @@ public class PostController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Post created successfully", response));
+    }
+
+    @PostMapping("/{postId}/comments")
+    public ResponseEntity<ApiResponse<CommentResponse>> addComment(
+            @PathVariable Long postId,
+            @Valid @RequestBody CreateCommentRequest request) {
+        CommentResponse response = commentService.addComment(postId, request);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Comment added successfully", response));
     }
 
     @PostMapping("/{postId}/like")

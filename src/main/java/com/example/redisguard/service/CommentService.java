@@ -6,6 +6,7 @@ import com.example.redisguard.entity.Bot;
 import com.example.redisguard.entity.Comment;
 import com.example.redisguard.entity.Post;
 import com.example.redisguard.exception.ResourceNotFoundException;
+import com.example.redisguard.exception.TooManyRequestsException;
 import com.example.redisguard.repo.BotRepository;
 import com.example.redisguard.repo.CommentRepository;
 import com.example.redisguard.repo.PostRepository;
@@ -26,6 +27,9 @@ public class CommentService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final BotRepository botRepository;
+    private final GuardrailService guardrailService;
+    private final ViralityService viralityService;
+    private final NotificationService notificationService;
 
     @Transactional
     public CommentResponse addComment(Long postId, CreateCommentRequest request) {
@@ -51,6 +55,26 @@ public class CommentService {
             depthLevel = parent.getDepthLevel() + 1;
         }
 
+        if (request.getAuthorType() == Post.AuthorType.BOT) {
+            // Vertical Cap check
+            if (depthLevel > 20) {
+                throw new TooManyRequestsException("Bot reply depth limit of 20 reached");
+            }
+
+            // Horizontal Cap check
+            if (!guardrailService.checkAndIncrementBotCount(postId)) {
+                throw new TooManyRequestsException("Bot reply limit of 100 reached for post " + postId);
+            }
+
+            // Cooldown Cap check — only if post belongs to a human
+//            if (post.getAuthorType() == Post.AuthorType.USER) {
+//                if (!guardrailService.checkAndSetCooldown(request.getAuthorId(), post.getAuthorId())) {
+//                    throw new TooManyRequestsException(
+//                            "Bot " + request.getAuthorId() + " is on cooldown for human " + post.getAuthorId()
+//                    );
+//                }
+//            }
+        }
 
         Comment comment = Comment.builder()
                 .post(post)
@@ -61,6 +85,23 @@ public class CommentService {
                 .build();
 
         Comment saved = commentRepository.save(comment);
+        log.info("Added comment id={} to post id={}", saved.getId(), postId);
+
+        if (request.getAuthorType() == Post.AuthorType.USER) {
+            viralityService.incrementHumanComment(postId);
+        } else {
+            viralityService.incrementBotReply(postId);
+        }
+
+        // Notification (only when bot comments on human's post)
+        if (request.getAuthorType() == Post.AuthorType.BOT
+                && post.getAuthorType() == Post.AuthorType.USER) {
+            Bot bot = botRepository.findById(request.getAuthorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Bot", request.getAuthorId()));
+            notificationService.handleBotInteractionNotification(post.getAuthorId(), bot.getName());
+        }
+
+        log.info("Added comment id={} to post id={} at depthLevel={}", saved.getId(), postId, depthLevel);
         return toResponse(saved);
     }
 
