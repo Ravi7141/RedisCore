@@ -1,6 +1,7 @@
 package com.example.redisguard.service;
 
 import com.example.redisguard.dto.request.CreatePostRequest;
+import com.example.redisguard.dto.response.LikeResponse;
 import com.example.redisguard.dto.response.PostResponse;
 import com.example.redisguard.entity.Post;
 import com.example.redisguard.exception.ResourceNotFoundException;
@@ -9,6 +10,7 @@ import com.example.redisguard.repo.PostRepository;
 import com.example.redisguard.repo.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,10 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final BotRepository botRepository;
+    private final ViralityService viralityService;
+
+    private static final String LIKE_KEY_PREFIX = "post:likes:";
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Transactional
     public PostResponse createPost(CreatePostRequest request) {
@@ -57,6 +63,30 @@ public class PostService {
                 .content(post.getContent())
                 .likeCount(post.getLikeCount())
                 .createdAt(post.getCreatedAt())
+                .build();
+    }
+    @Transactional
+    public LikeResponse likePost(Long postId) {
+        // Validate post exists
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post", postId));
+
+        // Atomically increment in Redis (fast-path)
+        String redisKey = LIKE_KEY_PREFIX + postId;
+        Long redisCount = redisTemplate.opsForValue().increment(redisKey);
+
+        // Also persist the increment in PostgreSQL (durable)
+        postRepository.incrementLikeCount(postId);
+
+        long likeCount = redisCount != null ? redisCount : post.getLikeCount() + 1;
+        log.info("Post {} liked. Redis count={}", postId, likeCount);
+        // After like is saved
+        viralityService.incrementHumanLike(postId);
+
+        return LikeResponse.builder()
+                .postId(postId)
+                .likeCount(likeCount)
+                .message("Post liked successfully")
                 .build();
     }
 }
