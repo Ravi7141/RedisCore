@@ -51,8 +51,8 @@ public class PostController {
     }
 
     @GetMapping("/{postId}/virality")
-    public ResponseEntity<?> getViralityScore(@PathVariable Long postId) {
+    public ResponseEntity<ApiResponse<Long>> getViralityScore(@PathVariable Long postId) {
         Long score = viralityService.getViralityScore(postId);
-        return ResponseEntity.ok(score);
+        return ResponseEntity.ok(ApiResponse.success("Virality score fetched successfully", score));
     }
 }
