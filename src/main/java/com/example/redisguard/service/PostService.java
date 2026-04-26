@@ -14,6 +14,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -41,6 +43,13 @@ public class PostService {
         Post saved = postRepository.save(post);
         log.info("Created post id={} by {}:{}", saved.getId(), saved.getAuthorType(), saved.getAuthorId());
         return toResponse(saved);
+    }
+
+    public List<PostResponse> getAllPost() {
+        return postRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     private void validateAuthorExists(Post.AuthorType type, Long authorId) {

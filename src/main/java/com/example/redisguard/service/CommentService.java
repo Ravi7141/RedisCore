@@ -66,14 +66,14 @@ public class CommentService {
                 throw new TooManyRequestsException("Bot reply limit of 100 reached for post " + postId);
             }
 
-            // Cooldown Cap check — only if post belongs to a human
-//            if (post.getAuthorType() == Post.AuthorType.USER) {
-//                if (!guardrailService.checkAndSetCooldown(request.getAuthorId(), post.getAuthorId())) {
-//                    throw new TooManyRequestsException(
-//                            "Bot " + request.getAuthorId() + " is on cooldown for human " + post.getAuthorId()
-//                    );
-//                }
-//            }
+//             Cooldown Cap check — only if post belongs to a human
+            if (post.getAuthorType() == Post.AuthorType.USER) {
+                if (!guardrailService.checkAndSetCooldown(request.getAuthorId(), post.getAuthorId())) {
+                    throw new TooManyRequestsException(
+                            "Bot " + request.getAuthorId() + " is on cooldown for human " + post.getAuthorId()
+                    );
+                }
+            }
         }
 
         Comment comment = Comment.builder()

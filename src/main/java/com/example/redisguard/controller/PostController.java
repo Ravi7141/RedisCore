@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/posts")
 @RequiredArgsConstructor
@@ -31,6 +33,13 @@ public class PostController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Post created successfully", response));
+    }
+    
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<PostResponse>>> getAllPost() {
+        List<PostResponse> response = postService.getAllPost();
+        return ResponseEntity
+                .ok(ApiResponse.success("Posts fetched successfully", response));
     }
 
     @PostMapping("/{postId}/comments")
